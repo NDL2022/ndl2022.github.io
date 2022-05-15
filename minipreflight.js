@@ -1,5 +1,8 @@
 import {NDL} from './NDL/NDL.js';
 
+// color for highlight
+const kOrange = '#ff8c00';
+
 var gNDL;
 function mountBlob(fileObject, inFileName, onFileMounted) 
 {
@@ -84,6 +87,14 @@ async function onFileDropped(ev)
 	}, 500);
 }
 
+function toastMessage(msg)
+{
+	$('#toast').text(msg).addClass('show');
+	setTimeout(()=>{
+		$('#toast').removeClass('show');
+	}, 2000);
+}
+
 function componentToHex(c) {
 	var hex = c.toString(16);
 	return hex.length == 1 ? '0' + hex : hex;
@@ -125,6 +136,7 @@ function RenderDocInfo(artwork)
 	let wxh = toSizeString(artwork.pageSize.width, artwork.pageSize.height);
 	let pageSize = $(tag).text(wxh + ' pt');
 	// Page boxes
+	let trimBox = artwork.pageBoxes['trimBox'];
 	let pageBoxTypes = ['mediaBox', 'trimBox', 'cropBox', 'bleedBox', 'artBox'];
 	let pageBoxDisplayName = {
 		'mediaBox' : 'Media Box'
@@ -133,14 +145,36 @@ function RenderDocInfo(artwork)
 		, 'bleedBox' : 'Bleed Box'
 		, 'artBox' : 'Art Box'
 	};
+	const kMinBleed = 9; // .125 inch or 9pt
 	let pageBoxGrids = [];
 	pageBoxTypes.forEach((type)=>
 	{
 		let box = artwork.pageBoxes[type];
 		if ( undefined != box )
 		{
+			// bleed check
+			let notEnoughBleed = false;
+			if ( 'bleedBox' == type )
+			{
+				let bleedBox = artwork.pageBoxes[type];
+				notEnoughBleed = ( bleedBox.x > (trimBox.x - kMinBleed)
+					|| (bleedBox.x + bleedBox.width ) < (trimBox.x + trimBox.width + kMinBleed)
+					|| bleedBox.y > (trimBox.y - kMinBleed)
+					|| (bleedBox.y + bleedBox.height) < (trimBox.y + trimBox.height + kMinBleed) );
+			}
+
 			pageBoxGrids.push($(tag).text(pageBoxDisplayName[type] +':'));
-			pageBoxGrids.push($(tag).text(toSizeString(box.width, box.height) + ' pt'));
+			if ( notEnoughBleed )
+			{
+				const id = type + '_value';
+				pageBoxGrids.push($(tag).text(toSizeString(box.width, box.height) + ' pt').css('color', kOrange).attr('title', 'Not enough bleed').attr('id', id).css('cursor', 'pointer'));
+				setTimeout(()=>{
+					$('#'+id).on('click', ()=>{
+						toastMessage('Not enough bleed');});
+				}, 0);
+			} else {
+				pageBoxGrids.push($(tag).text(toSizeString(box.width, box.height) + ' pt'));
+			}
 			pageBoxGrids.push($(tag));
 		}
 	});
@@ -223,16 +257,27 @@ function RenderImages(images)
 		let yppi = Math.floor(image.height * 72.0 / image.boundingBox.height);
 		let minppi = Math.min(xppi, yppi);
 		let ppi = $(tag).text(minppi + ' ppi');	
-		const kOrange = '#ff8c00';
 		if (minppi<300)
 		{
-			ppi.css('color', kOrange).attr('title', 'Image resolution less than 300ppi');
+			const id = 'image_ppi_' + i;
+			ppi.css('color', kOrange).attr('title', 'Image resolution less than 300 ppi').attr('id', id).css('cursor', 'pointer');
 			hasLowRes = true;
+			setTimeout( () => {
+				$('#'+id).on('click', ()=>{
+					toastMessage('Image resolution less than 300 ppi');
+				});
+			}, 0);
 		}
 		let colorSpace = $(tag).text(image.colorSpace);
 		if (image.colorSpace == 'RGB' )
 		{
-			colorSpace.css('color', kOrange).attr('title', 'Image in RGB');
+			const id = 'image_colorSpace_' + i;
+			colorSpace.css('color', kOrange).attr('title', 'Image in RGB').attr('id', id).css('cursor', 'pointer');
+			setTimeout( () => {
+				$('#'+id).on('click', ()=>{
+					toastMessage('Image in RGB');
+				});
+			}, 0);
 			hasRGB = true;
 		}
 	
@@ -318,7 +363,7 @@ function InspectPDF(filePath)
 	let ndl = gNDL;
 	let viewer = gNDL.viewer();
 	let loaded = viewer.loadPDF(filePath);
-	viewer.setDPI(4.0*72.0);
+	viewer.setDPI(2.0*72.0);
 	let jsonStr = viewer.getMetadata();
 	let xmp = undefined;
 	try {
