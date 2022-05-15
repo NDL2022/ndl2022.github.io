@@ -16,13 +16,22 @@ function viewer()
 // context of current document
 let ctx = {
 	settings : {
-		devicePixelRatio : 1.5
+		devicePixelRatio : 2.0
+		, antiAliasing : 2
 		, dpi : 72.0
 		, useGoogleFonts : true
 		, useSystemFonts : false
 		, systemFontsBaseURL : 'http://localhost:19999'
+		, editingDelay : 200 // to prevent too frequent text changes
+		, editingAntiAliasing : 1
+		, editingDevicePixelRatio : 1.5
 	}
 	, defaultOpenURL : 'resources/TextCyanMagenta.pdf'
+	, currentDevicePixelRatio : 2.0
+	, setDevicePixelRatio : (ratio) => {
+		ctx.currentDevicePixelRatio = ratio;
+		viewer().setDPI( ratio * ctx.settings.dpi);
+	}
 };
 
 function isPanelVisible(selector)
@@ -162,19 +171,50 @@ function UI()
 		toastMessage('Image Resolution is low');
 	});
 
+	// Text 
+	let editTimeoutID = 0;
+	let markTextChanged = () => {
+		if (!ctx.hasTextChange)
+		{
+			viewer().setAntiAliasing(ctx.settings.editingAntiAliasing);
+			ctx.setDevicePixelRatio(ctx.settings.editingDevicePixelRatio);
+			ctx.hasTextChange = true; // so that we know what to do when blur
+		}
+		ctx.hasTextChange = true;
+	};
+	let beginTextEdit = () => {
+		ctx.isEditingText = true;
+	};
+	let endTextEdit = () => {
+		viewer().setAntiAliasing(ctx.settings.antiAliasing);
+		ctx.setDevicePixelRatio(ctx.settings.devicePixelRatio);
+		if (ctx.hasTextChange)
+		{
+			clearTimeout(editTimeoutID);
+			loadCtx();
+			Repaint();
+		}
+		ctx.isEditingText = false;
+		ctx.hasTextChange = false;
+	};
+
 	let applyTextChanges = async () => {
 		let curText = $('#currentText').val();
 		if ( curText !== ctx.lastSetText )
 		{
+			//console.profile();
+			markTextChanged();
 			viewer().setTextText(getTextIndex(), curText);
 			ctx.lastSetText = curText;
 			loadCtx();
 			Repaint();
 			toastMessage('Text content changed');
+			//console.profileEnd();
 		}
 	};
 	let applyFontSizeChange = async()=> {
 		let fontSize = $('#fontSize').val();
+		markTextChanged();
 		fontSize = Math.max(0.99, fontSize);	
 		viewer().setTextFontSize(getTextIndex(), fontSize);
 		loadCtx();
@@ -182,33 +222,35 @@ function UI()
 		toastMessage('Font size changed: ' + fontSize + ' pt');
 	}
 
-	// deprecated: hide edit 
-	$('#editText').hide();
-	$('#editText').click(async ()=>{
-		applyTextChanges();
-	});
-
-	let editTimeoutID = 0;
 	$('#currentText').on('change keyup paste', ()=>{
 		clearTimeout(editTimeoutID);
 		editTimeoutID = setTimeout(
 			applyTextChanges
-			, 300
+			, ctx.settings.editingDelay
 		);
 	});
+
+	// start edit
 	$('#currentText').on('focus', ()=>{
-		ctx.isEditingText = true;
+		beginTextEdit();
 	});
+	// end edit
 	$('#currentText').on('blur', ()=>{
-		ctx.isEditingText = false;
+		endTextEdit();
 	});
 	let editFontSizeTimeoutID = 0;
 	$('#fontSize').change( ()=> {
 		clearTimeout(editFontSizeTimeoutID);
 		editFontSizeTimeoutID = setTimeout(
 			applyFontSizeChange
-			, 300
+			, ctx.settings.editingDelay
 		);
+	});
+	$('#fontSize').on('focus', ()=>{
+		beginTextEdit();
+	});
+	$('#fontSize').on('blur', ()=>{
+		endTextEdit();
 	});
 	$('#applyBarCode').click(async ()=>{
 		let str = $('#currentBarCode').val();
@@ -292,7 +334,8 @@ function UI()
 		let ratio = ratioFromUIValue($('#devicePixelRatioBar').val());
 		updateSpeedColor();
 		ctx.settings.devicePixelRatio = ratio;
-		viewer().setDPI(ctx.settings.devicePixelRatio * ctx.settings.dpi);
+		ctx.setDevicePixelRatio(ratio);// set this?
+		viewer().setAntiAliasing(ctx.settings.antiAliasing);
 		loadCtx_preview();
 		ResizeCanvas(ctx.previewRasterSize);
 		Repaint();
@@ -606,8 +649,10 @@ function ArrayToImageData(array, rasterSize)
 function UpdateCanvasPixelRatio()
 {
 	let canvas = document.getElementById('canvas');
-	canvas.style.width = canvas.width / ctx.settings.devicePixelRatio;
-	canvas.style.height = canvas.height / ctx.settings.devicePixelRatio;
+	canvas.style.width = canvas.width / ctx.currentDevicePixelRatio;
+	canvas.style.height = canvas.height / ctx.currentDevicePixelRatio;
+	// canvas.style.width = canvas.width / ctx.settings.devicePixelRatio;
+	// canvas.style.height = canvas.height / ctx.settings.devicePixelRatio;
 }
 
 function ResizeCanvas(rasterSize)
@@ -928,7 +973,7 @@ function ProcessPDF(filePath)
 {
 	console.log('Begin ProcessPDF ' + filePath);
 	let loaded = viewer().loadPDF(filePath);
-	viewer().setDPI( ctx.settings.devicePixelRatio * ctx.settings.dpi);
+	ctx.setDevicePixelRatio( ctx.settings.devicePixelRatio);
 	console.assert(loaded);
 	let json = viewer().getMetadata();
 	console.log(json);
