@@ -32,6 +32,26 @@ let ctx = {
 		ctx.currentDevicePixelRatio = ratio;
 		viewer().setDPI( ratio * ctx.settings.dpi);
 	}
+	, isEditingText : false
+	, endTextEditTimeoutID : undefined
+	, endTextEdit : () => {
+		viewer().setAntiAliasing(ctx.settings.antiAliasing);
+		ctx.setDevicePixelRatio(ctx.settings.devicePixelRatio);
+		if (ctx.hasTextChange)
+		{
+			loadCtx();
+			Repaint();
+		}
+		ctx.isEditingText = false;
+		ctx.hasTextChange = false;
+	}
+	, queueEndTextEdit : (timeout) => {
+		clearTimeout(ctx.endTextEditTimeoutID);
+		ctx.endTextEditTimeoutID = setTimeout(
+			() => {ctx.endTextEdit();}
+			, timeout
+		);
+	}
 };
 
 function isPanelVisible(selector)
@@ -173,6 +193,7 @@ function UI()
 
 	// Text 
 	let editTimeoutID = 0;
+	let editFontSizeTimeoutID = 0;
 	let markTextChanged = () => {
 		if (!ctx.hasTextChange)
 		{
@@ -186,16 +207,18 @@ function UI()
 		ctx.isEditingText = true;
 	};
 	let endTextEdit = () => {
+		
+		/*
 		viewer().setAntiAliasing(ctx.settings.antiAliasing);
 		ctx.setDevicePixelRatio(ctx.settings.devicePixelRatio);
 		if (ctx.hasTextChange)
 		{
-			clearTimeout(editTimeoutID);
 			loadCtx();
 			Repaint();
 		}
 		ctx.isEditingText = false;
 		ctx.hasTextChange = false;
+		*/
 	};
 
 	let applyTextChanges = async () => {
@@ -209,6 +232,8 @@ function UI()
 			loadCtx();
 			Repaint();
 			toastMessage('Text content changed');
+			
+			ctx.queueEndTextEdit(5*ctx.settings.editingDelay);
 			//console.profileEnd();
 		}
 	};
@@ -220,6 +245,7 @@ function UI()
 		loadCtx();
 		Repaint();
 		toastMessage('Font size changed: ' + fontSize + ' pt');
+		ctx.queueEndTextEdit(5*ctx.settings.editingDelay);
 	}
 
 	$('#currentText').on('change keyup paste', ()=>{
@@ -236,9 +262,8 @@ function UI()
 	});
 	// end edit
 	$('#currentText').on('blur', ()=>{
-		endTextEdit();
+		ctx.queueEndTextEdit(0);
 	});
-	let editFontSizeTimeoutID = 0;
 	$('#fontSize').change( ()=> {
 		clearTimeout(editFontSizeTimeoutID);
 		editFontSizeTimeoutID = setTimeout(
@@ -250,7 +275,7 @@ function UI()
 		beginTextEdit();
 	});
 	$('#fontSize').on('blur', ()=>{
-		endTextEdit();
+		ctx.queueEndTextEdit(0);
 	});
 	$('#applyBarCode').click(async ()=>{
 		let str = $('#currentBarCode').val();
