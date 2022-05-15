@@ -169,20 +169,6 @@ function UI()
 		downloadAs(array, downloadFileName);
 	});
 
-	let changeTextJustification = async (justification) => {
-		viewer().setTextJustification(getTextIndex(), justification);
-		loadCtx();
-		Repaint();
-	};
-	$('#alignLeft').click(async ()=>{changeTextJustification(0)});
-	$('#alignCenter').click(async ()=>{changeTextJustification(1)});
-	$('#alignRight').click(async ()=>{changeTextJustification(2)});
-	$('#justifyLeft').click(async ()=>{changeTextJustification(3)});
-	$('#justifyCenter').click(async ()=>{changeTextJustification(4)});
-	$('#justifyRight').click(async ()=>{changeTextJustification(5)});
-	$('#justifyAll').click(async ()=>{changeTextJustification(6)});
-
-
 	$('#rgbColorSpace').on('click', ()=>{
 		toastMessage('Image in RGB color space');
 	});
@@ -194,6 +180,7 @@ function UI()
 	// Text 
 	let editTimeoutID = 0;
 	let editFontSizeTimeoutID = 0;
+	let editJustificationTimeoutID = 0;
 	let markTextChanged = () => {
 		if (!ctx.hasTextChange)
 		{
@@ -238,8 +225,9 @@ function UI()
 		}
 	};
 	let applyFontSizeChange = async()=> {
-		let fontSize = $('#fontSize').val();
 		markTextChanged();
+
+		let fontSize = $('#fontSize').val();
 		fontSize = Math.max(0.99, fontSize);	
 		viewer().setTextFontSize(getTextIndex(), fontSize);
 		loadCtx();
@@ -247,6 +235,15 @@ function UI()
 		toastMessage('Font size changed: ' + fontSize + ' pt');
 		ctx.queueEndTextEdit(5*ctx.settings.editingDelay);
 	}
+
+	let applyJustificationChange = async (justification) => {
+		markTextChanged();
+
+		viewer().setTextJustification(getTextIndex(), justification);
+		loadCtx();
+		Repaint();
+		ctx.queueEndTextEdit(5*ctx.settings.editingDelay);
+	};
 
 	$('#currentText').on('change keyup paste', ()=>{
 		clearTimeout(editTimeoutID);
@@ -277,6 +274,24 @@ function UI()
 	$('#fontSize').on('blur', ()=>{
 		ctx.queueEndTextEdit(0);
 	});
+
+	let changeTextJustification = async (justification) => {
+		clearTimeout(editJustificationTimeoutID);
+		editJustificationTimeoutID = setTimeout(()=>{
+			applyJustificationChange(justification);
+		}, 0); // nodelay since it's a button
+	};
+
+	$('#alignLeft').click(async ()=>{changeTextJustification(0)});
+	$('#alignCenter').click(async ()=>{changeTextJustification(1)});
+	$('#alignRight').click(async ()=>{changeTextJustification(2)});
+	$('#justifyLeft').click(async ()=>{changeTextJustification(3)});
+	$('#justifyCenter').click(async ()=>{changeTextJustification(4)});
+	$('#justifyRight').click(async ()=>{changeTextJustification(5)});
+	$('#justifyAll').click(async ()=>{changeTextJustification(6)});
+
+
+
 	$('#applyBarCode').click(async ()=>{
 		let str = $('#currentBarCode').val();
 		viewer().setBarCode(getBarCodeIndex(), str);
