@@ -26,7 +26,7 @@ let ctx = {
 		, editingAntiAliasing : 1
 		, editingDevicePixelRatio : 1.5
 	}
-	, defaultOpenURL : 'resources/TextCyanMagenta.pdf'
+	, defaultOpenURL : 'samples/TextCyanMagenta.pdf'
 	, currentDevicePixelRatio : 2.0
 	, setDevicePixelRatio : (ratio) => {
 		ctx.currentDevicePixelRatio = ratio;
@@ -715,7 +715,7 @@ function Repaint()
 {
 	//const kHighlightColor = '#444B53';
 	const kHighlightColor = '#A6C044';
-	let kHighlightWidth = 2.0 * ctx.settings.devicePixelRatio;
+	let kHighlightWidth = 3.0 * ctx.settings.devicePixelRatio;
 	let drawOnCanvas = (array, rasterSize) =>{
 		let canvas = document.getElementById("canvas");
 		let twoD = canvas.getContext("2d");
