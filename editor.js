@@ -294,7 +294,15 @@ function UI()
 
 	$('#applyBarCode').click(async ()=>{
 		let str = $('#currentBarCode').val();
-		viewer().setBarCode(getBarCodeIndex(), str);
+		let retStr = viewer().setBarCode(getBarCodeIndex(), str);
+		try {
+			let ret = JSON.parse(retStr);
+			if ( undefined != ret.error && ret.error != 0 )
+			{
+				toastMessage('Unable to change barcode: ' + ret.message );
+				return;	
+			}
+		} catch (err) {}
 		loadCtx();
 		Repaint();
 		toastMessage('Barcode changed: ' + str );
